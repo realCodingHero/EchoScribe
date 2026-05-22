@@ -143,7 +143,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _dispatcher.Invoke(() =>
             {
                 ModelLoadingStatus = "模型文件不存在，正在自动下载...";
-                StatusMessage = "⏬ 正在下载 AI 模型（首次运行需要下载约 230MB）";
+                StatusMessage = "⏬ 正在下载 AI 模型（首次运行需要下载约 240MB）";
             });
 
             // 自动开始下载

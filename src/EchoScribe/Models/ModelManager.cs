@@ -16,19 +16,17 @@ public class ModelManager
     public const string SenseVoiceModelDirName = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue";
 
     /// <summary>
-    /// 所需的模型文件及其下载 URL（从 Hugging Face 单文件下载）
+    /// 所需的模型文件及其下载 URL（使用 int8 量化版本，体积仅 ~239MB，精度损失极小）
     /// </summary>
     private static readonly ModelFileInfo[] RequiredModelFiles =
     [
-        new("model.onnx",
-            "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.onnx",
-            "ASR 语音识别模型",
-            约230_000_000), // ~230MB
+        new("model.int8.onnx",
+            "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx",
+            "ASR 语音识别模型 (int8)"),
 
         new("tokens.txt",
             "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt",
-            "词表文件",
-            约200_000), // ~200KB
+            "词表文件"),
     ];
 
     /// <summary>
@@ -37,13 +35,7 @@ public class ModelManager
     private static readonly ModelFileInfo VadModelFileInfo = new(
         "silero_vad.onnx",
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
-        "VAD 语音活动检测模型",
-        约2_000_000); // ~2MB
-
-    // 用中文"约"命名的常量辅助字段 — 仅用于预估大小显示
-    private const long 约230_000_000 = 230_000_000;
-    private const long 约200_000 = 200_000;
-    private const long 约2_000_000 = 2_000_000;
+        "VAD 语音活动检测模型");
 
     public string ModelDir => Path.Combine(_modelBaseDir, SenseVoiceModelDirName);
 
@@ -132,11 +124,28 @@ public class ModelManager
         }
 
         using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromMinutes(30);
+        httpClient.Timeout = TimeSpan.FromMinutes(60);
         // 某些 CDN 需要 User-Agent
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("EchoScribe/1.0");
 
-        long totalEstimatedSize = filesToDownload.Sum(f => f.EstimatedSize);
+        // 先用 HEAD 请求获取所有文件的真实大小
+        progress(new ModelDownloadProgress("", 0, 0, "正在获取文件信息..."));
+        var fileSizes = new long[filesToDownload.Count];
+        long totalSize = 0;
+        for (int i = 0; i < filesToDownload.Count; i++)
+        {
+            try
+            {
+                using var headReq = new HttpRequestMessage(HttpMethod.Head, filesToDownload[i].Url);
+                using var headResp = await httpClient.SendAsync(headReq, ct);
+                fileSizes[i] = headResp.Content.Headers.ContentLength ?? 0;
+            }
+            catch { fileSizes[i] = 0; }
+            totalSize += fileSizes[i];
+        }
+        // 防止除零
+        if (totalSize <= 0) totalSize = 1;
+
         long totalDownloaded = 0;
 
         for (int i = 0; i < filesToDownload.Count; i++)
@@ -149,7 +158,7 @@ public class ModelManager
 
             progress(new ModelDownloadProgress(
                 fileInfo.FileName, 0,
-                (int)(totalDownloaded * 100 / totalEstimatedSize),
+                (int)(totalDownloaded * 100 / totalSize),
                 $"正在下载 {fileInfo.Description} ({i + 1}/{filesToDownload.Count})..."));
 
             try
@@ -158,7 +167,7 @@ public class ModelManager
                     HttpCompletionOption.ResponseHeadersRead, ct);
                 response.EnsureSuccessStatusCode();
 
-                var contentLength = response.Content.Headers.ContentLength ?? fileInfo.EstimatedSize;
+                var contentLength = response.Content.Headers.ContentLength ?? fileSizes[i];
 
                 // 使用显式 using 块确保流在 File.Move 之前完全释放
                 {
@@ -183,7 +192,7 @@ public class ModelManager
                                     ? (int)(fileDownloaded * 100 / contentLength)
                                     : -1;
 
-                                var overallPercent = (int)((totalDownloaded + fileDownloaded) * 100 / totalEstimatedSize);
+                                var overallPercent = (int)((totalDownloaded + fileDownloaded) * 100 / totalSize);
 
                                 progress(new ModelDownloadProgress(
                                     fileInfo.FileName, filePercent,
@@ -242,8 +251,7 @@ public class ModelManager
 public record ModelFileInfo(
     string FileName,
     string Url,
-    string Description,
-    long EstimatedSize);
+    string Description);
 
 /// <summary>
 /// 模型下载进度

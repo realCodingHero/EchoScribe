@@ -27,7 +27,7 @@ public sealed class SherpaOnnxEngine : IDisposable
     {
         try
         {
-            var modelPath = Path.Combine(_modelDir, "model.onnx");
+            var modelPath = Path.Combine(_modelDir, "model.int8.onnx");
             var tokensPath = Path.Combine(_modelDir, "tokens.txt");
 
             if (!File.Exists(modelPath))
