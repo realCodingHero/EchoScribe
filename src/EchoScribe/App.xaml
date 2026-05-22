@@ -15,6 +15,8 @@
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <converters:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter" />
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+            <converters:DownloadIconConverter x:Key="DownloadIconConverter" />
 
             <!-- 自定义配色 -->
             <SolidColorBrush x:Key="AccentPrimary" Color="#6C5CE7" />
