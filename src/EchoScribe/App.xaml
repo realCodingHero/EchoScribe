@@ -1,0 +1,31 @@
+<Application x:Class="EchoScribe.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:converters="clr-namespace:EchoScribe.Views.Converters"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- 值转换器 -->
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <converters:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter" />
+
+            <!-- 自定义配色 -->
+            <SolidColorBrush x:Key="AccentPrimary" Color="#6C5CE7" />
+            <SolidColorBrush x:Key="AccentSecondary" Color="#A29BFE" />
+            <SolidColorBrush x:Key="SuccessGreen" Color="#00B894" />
+            <SolidColorBrush x:Key="WarningOrange" Color="#FDCB6E" />
+            <SolidColorBrush x:Key="DangerRed" Color="#FF6B6B" />
+            <SolidColorBrush x:Key="SurfaceDark" Color="#1E1E2E" />
+            <SolidColorBrush x:Key="SurfaceMedium" Color="#2D2D3F" />
+            <SolidColorBrush x:Key="TextPrimary" Color="#E0E0E0" />
+            <SolidColorBrush x:Key="TextSecondary" Color="#8B8BA7" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

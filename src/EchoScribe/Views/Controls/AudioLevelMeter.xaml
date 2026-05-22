@@ -1,0 +1,22 @@
+<UserControl x:Class="EchoScribe.Views.Controls.AudioLevelMeter"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border x:Name="BackgroundBorder"
+            Background="#33FFFFFF"
+            CornerRadius="4"
+            Height="{Binding Height, RelativeSource={RelativeSource AncestorType=UserControl}}">
+
+        <Border x:Name="LevelBar"
+                CornerRadius="4"
+                HorizontalAlignment="Left">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00B894" Offset="0.0" />
+                    <GradientStop Color="#FDCB6E" Offset="0.6" />
+                    <GradientStop Color="#FF6B6B" Offset="1.0" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+    </Border>
+</UserControl>
