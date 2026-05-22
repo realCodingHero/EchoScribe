@@ -34,7 +34,7 @@ bld/
 *.sln.iml
 
 ## ASR Models (large files, download separately)
-models/
+/models/
 
 ## OS
 Thumbs.db
