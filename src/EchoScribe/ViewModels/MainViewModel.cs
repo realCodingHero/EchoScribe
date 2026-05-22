@@ -85,6 +85,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isProcessLoopbackSupported;
 
+    /// <summary>是否正在下载模型</summary>
+    [ObservableProperty]
+    private bool _isDownloadingModel;
+
+    /// <summary>下载进度（0-100）</summary>
+    [ObservableProperty]
+    private int _downloadProgress;
+
+    /// <summary>下载进度文本</summary>
+    [ObservableProperty]
+    private string _downloadProgressText = "";
+
+    private CancellationTokenSource? _downloadCts;
+
     public MainViewModel()
     {
         _dispatcher = Dispatcher.CurrentDispatcher;
@@ -113,35 +127,101 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _levelTimer.Tick += (_, _) => UpdateAudioLevels();
         _levelTimer.Start();
 
-        // 异步加载模型
+        // 异步加载模型（如果缺失会自动下载）
         await Task.Run(LoadModel);
     }
 
     /// <summary>
-    /// 加载 ASR 模型
+    /// 加载 ASR 模型（如果缺失则自动下载）
     /// </summary>
-    private void LoadModel()
+    private async Task LoadModel()
     {
         var checkResult = _modelManager.CheckModels();
 
         if (!checkResult.IsReady)
         {
-            var instructions = ModelManager.GetDownloadInstructions(checkResult);
             _dispatcher.Invoke(() =>
             {
-                ModelLoadingStatus = "模型文件不存在，请参照指引下载";
-                StatusMessage = "⚠ 需要下载模型文件";
+                ModelLoadingStatus = "模型文件不存在，正在自动下载...";
+                StatusMessage = "⏬ 正在下载 AI 模型（首次运行需要下载约 230MB）";
             });
+
+            // 自动开始下载
+            await DownloadAndLoadModelsAsync();
             return;
         }
 
-        // 初始化 ASR 引擎
+        // 模型存在，直接加载
+        InitializeEngines();
+    }
+
+    /// <summary>
+    /// 下载模型并加载
+    /// </summary>
+    private async Task DownloadAndLoadModelsAsync()
+    {
+        _downloadCts = new CancellationTokenSource();
+
+        _dispatcher.Invoke(() =>
+        {
+            IsDownloadingModel = true;
+            DownloadProgress = 0;
+            DownloadProgressText = "准备下载...";
+        });
+
+        try
+        {
+            await _modelManager.DownloadModelsAsync(progress =>
+            {
+                _dispatcher.InvokeAsync(() =>
+                {
+                    DownloadProgress = progress.OverallPercent;
+                    DownloadProgressText = progress.StatusText;
+                    ModelLoadingStatus = progress.StatusText;
+                    StatusMessage = $"⏬ 下载中: {progress.OverallPercent}%";
+                });
+            }, _downloadCts.Token);
+
+            _dispatcher.Invoke(() =>
+            {
+                IsDownloadingModel = false;
+                ModelLoadingStatus = "下载完成，正在加载模型...";
+                StatusMessage = "正在加载模型...";
+            });
+
+            // 下载完成，加载引擎
+            InitializeEngines();
+        }
+        catch (OperationCanceledException)
+        {
+            _dispatcher.Invoke(() =>
+            {
+                IsDownloadingModel = false;
+                ModelLoadingStatus = "下载已取消";
+                StatusMessage = "⚠ 模型下载已取消";
+            });
+        }
+        catch (Exception ex)
+        {
+            _dispatcher.Invoke(() =>
+            {
+                IsDownloadingModel = false;
+                ModelLoadingStatus = $"下载失败: {ex.Message}";
+                StatusMessage = "✗ 模型下载失败，请检查网络连接";
+            });
+        }
+    }
+
+    /// <summary>
+    /// 初始化 ASR 和 VAD 引擎
+    /// </summary>
+    private void InitializeEngines()
+    {
         _dispatcher.Invoke(() => ModelLoadingStatus = "正在加载 ASR 模型...");
 
         _asrEngine = new SherpaOnnxEngine(_modelManager.ModelDir);
         var asrOk = _asrEngine.Initialize(useCuda: true);
 
-        // 初始化 VAD 引擎
         _dispatcher.Invoke(() => ModelLoadingStatus = "正在加载 VAD 模型...");
 
         _vadEngine = new VadEngine(_modelManager.ModelDir);
@@ -154,6 +234,25 @@ public partial class MainViewModel : ObservableObject, IDisposable
             StatusMessage = asrOk ? "✓ 模型就绪，选择进程后即可开始转录" : "✗ 模型加载失败";
             GpuInfo = asrOk ? "SenseVoice (GPU)" : "SenseVoice (CPU)";
         });
+    }
+
+    /// <summary>
+    /// 手动重新下载模型
+    /// </summary>
+    [RelayCommand]
+    private async Task RetryDownloadModels()
+    {
+        if (IsDownloadingModel) return;
+        await Task.Run(DownloadAndLoadModelsAsync);
+    }
+
+    /// <summary>
+    /// 取消下载
+    /// </summary>
+    [RelayCommand]
+    private void CancelDownload()
+    {
+        _downloadCts?.Cancel();
     }
 
     // === 命令 ===
@@ -452,6 +551,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _scanTimer?.Stop();
         _levelTimer?.Stop();
         StopTranscriptionInternal();
+        _downloadCts?.Cancel();
+        _downloadCts?.Dispose();
         _asrEngine?.Dispose();
         _vadEngine?.Dispose();
     }
